@@ -22,6 +22,7 @@ class FirestoreService:
         self.extraction_results_collection = "extraction_results"
         self.file_extraction_results_collection = "file_extraction_results"  # NEW: Structured file results
         self.calendar_events_collection = "calendar_events"
+        self.finance_events_collection = "finance_events"  # NEW: Finance events collection
     
     def get_emails_by_status(self, status: str) -> List[Dict[str, Any]]:
         """
@@ -154,6 +155,16 @@ class FirestoreService:
             
             # 2. Save each file as a separate document for easy querying by other services
             files_data = extraction_data.get("files", {})
+            
+            # Handle case where files might be empty but extraction data contains nested structure
+            if not files_data:
+                # Try to find files in nested structure (for backward compatibility with existing data)
+                for key, value in extraction_data.items():
+                    if isinstance(value, dict) and 'files' in value and value['files']:
+                        files_data = value['files']
+                        logger.info(f"Found files in nested structure under key '{key}' for email {email_id}")
+                        break
+            
             if files_data:
                 for file_id, file_result in files_data.items():
                     file_doc_id = f"{email_id}_{file_id}"
@@ -216,6 +227,24 @@ class FirestoreService:
             
             # Commit all operations atomically
             batch.commit()
+            
+            # 3. Handle calendar events if present in extraction data
+            calendar_events = extraction_data.get("calendar_add_details", [])
+            if calendar_events and isinstance(calendar_events, list):
+                try:
+                    self.save_calendar_events(calendar_events)
+                    logger.info(f"Saved {len(calendar_events)} calendar events for email {email_id}")
+                except Exception as e:
+                    logger.error(f"Failed to save calendar events for email {email_id}: {e}")
+            
+            # 4. Handle finance events if present in extraction data
+            finance_events = extraction_data.get("finance_events", [])
+            if finance_events and isinstance(finance_events, list):
+                try:
+                    self.save_finance_events(finance_events)
+                    logger.info(f"Saved {len(finance_events)} finance events for email {email_id}")
+                except Exception as e:
+                    logger.error(f"Failed to save finance events for email {email_id}: {e}")
             
             logger.info(f"Saved extraction result for email {email_id} with {len(files_data)} file results")
             return True
@@ -420,6 +449,47 @@ class FirestoreService:
             
         except Exception as e:
             logger.error(f"Error saving calendar events: {e}")
+            return False
+
+    def save_finance_events(self, finance_events: List[Dict[str, Any]]) -> bool:
+        """
+        Save finance events from extraction results
+        
+        Args:
+            finance_events: List of finance events to save
+        
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            batch = self.db.batch()
+            
+            for event in finance_events:
+                # Generate a unique ID for the finance event
+                event_ref = self.db.collection(self.finance_events_collection).document()
+                
+                event_data = {
+                    "type": event.get("type", ""),  # Expense, Income, Transfer, etc.
+                    "amount": event.get("amount", ""),
+                    "currency": event.get("currency", ""),
+                    "date": event.get("date", ""),
+                    "category": event.get("category", ""),
+                    "payee": event.get("payee", ""),
+                    "source_mail_id": event.get("source_mail_id", ""),
+                    "source_file_id": event.get("source_file_id", ""),
+                    "created_at": firestore.SERVER_TIMESTAMP
+                }
+                
+                batch.set(event_ref, event_data)
+            
+            # Commit all finance events in a batch
+            batch.commit()
+            
+            logger.info(f"Saved {len(finance_events)} finance events")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error saving finance events: {e}")
             return False
     
     def update_file_gcs_url(self, email_id: str, file_id: str, gcs_url: str) -> bool:

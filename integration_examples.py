@@ -67,6 +67,86 @@ class IntegrationExamples:
         
         return {'urgent': len(urgent_items), 'due_soon': len(payments_due)}
     
+    def run_calendar_events_example(self):
+        """Example: Calendar Events Integration"""
+        print("\n📅 Calendar Events Example")
+        print("=" * 35)
+        
+        # Get all calendar events
+        calendar_events = list(self.fs.db.collection('calendar_events').stream())
+        
+        # Get upcoming events (next 7 days)
+        today = datetime.now().strftime("%Y-%m-%d")
+        week_ahead = (datetime.now() + timedelta(days=7)).strftime("%Y-%m-%d")
+        
+        upcoming_events = list(
+            self.fs.db.collection('calendar_events')
+            .where("date", ">=", today)
+            .where("date", "<=", week_ahead)
+            .order_by("date")
+            .stream()
+        )
+        
+        print(f"📊 Calendar Events Summary:")
+        print(f"   Total events: {len(calendar_events)}")
+        print(f"   Upcoming (7 days): {len(upcoming_events)}")
+        
+        if upcoming_events:
+            print("   Upcoming events:")
+            for event_doc in upcoming_events[:3]:
+                event = event_doc.to_dict()
+                print(f"     • {event.get('date')} at {event.get('time')}: {event.get('action', 'N/A')[:50]}...")
+        
+        return {'total': len(calendar_events), 'upcoming': len(upcoming_events)}
+    
+    def run_finance_events_example(self):
+        """Example: Finance Events Integration"""
+        print("\n💳 Finance Events Example")
+        print("=" * 30)
+        
+        # Get all finance events
+        finance_events = list(self.fs.db.collection('finance_events').stream())
+        
+        total_expenses = 0
+        total_income = 0
+        categories = {}
+        
+        print(f"📊 Finance Events Summary:")
+        print(f"   Total events: {len(finance_events)}")
+        
+        for event_doc in finance_events:
+            event = event_doc.to_dict()
+            amount = float(event.get('amount', '0'))
+            event_type = event.get('type', 'Unknown')
+            category = event.get('category', 'Other')
+            
+            if event_type == 'Expense':
+                total_expenses += amount
+            elif event_type == 'Income':
+                total_income += amount
+            
+            # Count by category
+            if category not in categories:
+                categories[category] = 0
+            categories[category] += amount
+        
+        print(f"   Total expenses: €{total_expenses:,.2f}")
+        print(f"   Total income: €{total_income:,.2f}")
+        print(f"   Net: €{total_income - total_expenses:,.2f}")
+        
+        if categories:
+            print("   Top categories:")
+            sorted_categories = sorted(categories.items(), key=lambda x: x[1], reverse=True)
+            for category, amount in sorted_categories[:3]:
+                print(f"     • {category}: €{amount:,.2f}")
+        
+        return {
+            'total_events': len(finance_events),
+            'total_expenses': total_expenses,
+            'total_income': total_income,
+            'categories': len(categories)
+        }
+    
     def run_all_examples(self):
         """Run all examples"""
         print("🧪 FPS Integration Examples")
@@ -82,8 +162,10 @@ class IntegrationExamples:
         # Run examples
         self.run_expense_tracking_example()
         self.run_daily_briefing_example()
+        self.run_calendar_events_example()
+        self.run_finance_events_example()
         
-        print("\n🎉 Examples completed!")
+        print("\n🎉 All examples completed!")
 
 if __name__ == "__main__":
     examples = IntegrationExamples()

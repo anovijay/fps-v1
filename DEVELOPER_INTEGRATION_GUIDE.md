@@ -55,12 +55,14 @@ for invoice in unpaid_invoices:
 
 ### Collections Overview
 
-The FPS system uses two main collections for extraction results:
+The FPS system uses four main collections for extraction results:
 
 | Collection | Purpose | Use Case |
 |------------|---------|----------|
 | `extraction_results` | Email-level summaries | Backward compatibility, email overviews |
 | `file_extraction_results` | **Structured file data** | **Your primary data source** |
+| `calendar_events` | **Calendar events** | **Scheduling, reminders, event management** |
+| `finance_events` | **Financial transactions** | **Expense tracking, budgeting, analytics** |
 
 ### Why Use `file_extraction_results`?
 
@@ -140,6 +142,88 @@ contracts = fs.get_documents_by_type("Contract", limit=10)
 ```
 
 **Returns:** List of documents of the specified type
+
+### 4. Calendar Events Methods
+
+#### Direct Collection Access
+Get calendar events for scheduling and reminders.
+
+```python
+# Get all calendar events
+calendar_events = list(fs.db.collection('calendar_events').stream())
+
+# Get events for a specific date range
+from datetime import datetime, timedelta
+
+today = datetime.now().strftime("%Y-%m-%d")
+week_ahead = (datetime.now() + timedelta(days=7)).strftime("%Y-%m-%d")
+
+upcoming_events = list(
+    fs.db.collection('calendar_events')
+    .where("date", ">=", today)
+    .where("date", "<=", week_ahead)
+    .order_by("date")
+    .stream()
+)
+```
+
+**Calendar Event Structure:**
+```json
+{
+  "date": "2025-06-23",
+  "time": "13:00",
+  "action": "Expected delivery of Amazon order #305-9866777-4782746",
+  "source_mail_id": "28SkaA98anLw1NmUabDI",
+  "source_file_id": null,
+  "execution_details": {
+    "location": "Anoop – Ismaning"
+  },
+  "created_at": "2025-06-22T22:13:53.888Z"
+}
+```
+
+### 5. Finance Events Methods
+
+#### Direct Collection Access
+Get financial transactions for expense tracking and analytics.
+
+```python
+# Get all finance events
+finance_events = list(fs.db.collection('finance_events').stream())
+
+# Get expenses for a specific month
+from datetime import datetime
+
+# Get June 2025 finance events
+june_events = list(
+    fs.db.collection('finance_events')
+    .where("date", ">=", "01062025")
+    .where("date", "<", "01072025")
+    .stream()
+)
+
+# Get events by category
+travel_expenses = list(
+    fs.db.collection('finance_events')
+    .where("category", "==", "Travel")
+    .stream()
+)
+```
+
+**Finance Event Structure:**
+```json
+{
+  "type": "Expense",
+  "amount": "41.45",
+  "currency": "EUR",
+  "date": "20062025",
+  "category": "Shopping",
+  "payee": "Amazon.de",
+  "source_mail_id": "28SkaA98anLw1NmUabDI",
+  "source_file_id": null,
+  "created_at": "2025-06-22T22:16:09.786Z"
+}
+```
 
 ## Integration Examples
 
@@ -524,6 +608,256 @@ trends = analytics.get_spending_trends(months_back=6)
 vendor_analysis = analytics.get_vendor_analysis()
 ```
 
+### 5. Calendar Events Integration Service
+
+```python
+class CalendarIntegrationService:
+    def __init__(self):
+        self.fs = FirestoreService()
+    
+    def get_upcoming_events(self, days_ahead=7):
+        """Get calendar events for the next N days"""
+        from datetime import datetime, timedelta
+        
+        today = datetime.now().strftime("%Y-%m-%d")
+        future_date = (datetime.now() + timedelta(days=days_ahead)).strftime("%Y-%m-%d")
+        
+        events = list(
+            self.fs.db.collection('calendar_events')
+            .where("date", ">=", today)
+            .where("date", "<=", future_date)
+            .order_by("date")
+            .order_by("time")
+            .stream()
+        )
+        
+        return [self._format_calendar_event(event) for event in events]
+    
+    def get_delivery_reminders(self):
+        """Get delivery-related calendar events"""
+        events = list(
+            self.fs.db.collection('calendar_events')
+            .where("action", ">=", "delivery")
+            .where("action", "<", "deliverz")  # Simple text range query
+            .stream()
+        )
+        
+        return [self._format_calendar_event(event) for event in events]
+    
+    def get_hotel_checkins(self):
+        """Get hotel check-in events"""
+        events = list(
+            self.fs.db.collection('calendar_events')
+            .where("action", ">=", "Check-in")
+            .where("action", "<", "Check-io")  # Simple text range query
+            .stream()
+        )
+        
+        return [self._format_calendar_event(event) for event in events]
+    
+    def _format_calendar_event(self, event_doc):
+        """Format calendar event for external use"""
+        data = event_doc.to_dict()
+        return {
+            'id': event_doc.id,
+            'date': data.get('date'),
+            'time': data.get('time'),
+            'title': data.get('action'),
+            'location': data.get('execution_details', {}).get('location'),
+            'source_email': data.get('source_mail_id'),
+            'details': data.get('execution_details', {}),
+            'created_at': data.get('created_at')
+        }
+    
+    def create_ical_export(self, events):
+        """Export events to iCal format"""
+        ical_content = [
+            "BEGIN:VCALENDAR",
+            "VERSION:2.0",
+            "PRODID:-//FPS//Email Extraction Calendar//EN"
+        ]
+        
+        for event in events:
+            ical_content.extend([
+                "BEGIN:VEVENT",
+                f"DTSTART:{self._format_ical_datetime(event['date'], event['time'])}",
+                f"SUMMARY:{event['title']}",
+                f"DESCRIPTION:{event.get('details', '')}",
+                f"LOCATION:{event.get('location', '')}",
+                f"UID:{event['id']}@fps-system",
+                "END:VEVENT"
+            ])
+        
+        ical_content.append("END:VCALENDAR")
+        return "\n".join(ical_content)
+    
+    def _format_ical_datetime(self, date_str, time_str):
+        """Format datetime for iCal"""
+        # Convert YYYY-MM-DD and HH:MM to YYYYMMDDTHHMMSS
+        date_part = date_str.replace('-', '')
+        time_part = time_str.replace(':', '') + '00'
+        return f"{date_part}T{time_part}"
+
+# Usage
+calendar_service = CalendarIntegrationService()
+upcoming = calendar_service.get_upcoming_events(days_ahead=14)
+deliveries = calendar_service.get_delivery_reminders()
+ical_export = calendar_service.create_ical_export(upcoming)
+```
+
+### 6. Finance Events Integration Service
+
+```python
+class FinanceIntegrationService:
+    def __init__(self):
+        self.fs = FirestoreService()
+    
+    def get_monthly_finance_summary(self, year, month):
+        """Get comprehensive finance summary for a month"""
+        # Get finance events for the month
+        start_date = f"{year:02d}{month:02d}01"
+        if month == 12:
+            end_date = f"{year+1:02d}0101"
+        else:
+            end_date = f"{year:02d}{month+1:02d}01"
+        
+        events = list(
+            self.fs.db.collection('finance_events')
+            .where("date", ">=", start_date)
+            .where("date", "<", end_date)
+            .stream()
+        )
+        
+        summary = {
+            'period': f"{year}-{month:02d}",
+            'total_expenses': 0,
+            'total_income': 0,
+            'by_category': {},
+            'by_payee': {},
+            'currency_breakdown': {},
+            'events': []
+        }
+        
+        for event_doc in events:
+            event = event_doc.to_dict()
+            event['id'] = event_doc.id
+            summary['events'].append(event)
+            
+            # Parse amount
+            amount = self._parse_amount(event.get('amount', '0'))
+            currency = event.get('currency', 'EUR')
+            event_type = event.get('type', 'Expense')
+            category = event.get('category', 'Other')
+            payee = event.get('payee', 'Unknown')
+            
+            # Aggregate totals
+            if event_type == 'Expense':
+                summary['total_expenses'] += amount
+            elif event_type == 'Income':
+                summary['total_income'] += amount
+            
+            # Category breakdown
+            if category not in summary['by_category']:
+                summary['by_category'][category] = {'amount': 0, 'count': 0}
+            summary['by_category'][category]['amount'] += amount
+            summary['by_category'][category]['count'] += 1
+            
+            # Payee breakdown
+            if payee not in summary['by_payee']:
+                summary['by_payee'][payee] = {'amount': 0, 'count': 0}
+            summary['by_payee'][payee]['amount'] += amount
+            summary['by_payee'][payee]['count'] += 1
+            
+            # Currency breakdown
+            if currency not in summary['currency_breakdown']:
+                summary['currency_breakdown'][currency] = 0
+            summary['currency_breakdown'][currency] += amount
+        
+        summary['net_amount'] = summary['total_income'] - summary['total_expenses']
+        return summary
+    
+    def get_expense_trends(self, months=6):
+        """Get expense trends over multiple months"""
+        from datetime import datetime, timedelta
+        
+        trends = []
+        current_date = datetime.now()
+        
+        for i in range(months):
+            month_date = current_date - timedelta(days=30 * i)
+            monthly_summary = self.get_monthly_finance_summary(
+                month_date.year, month_date.month
+            )
+            trends.append(monthly_summary)
+        
+        return list(reversed(trends))  # Chronological order
+    
+    def get_top_payees(self, limit=10):
+        """Get top payees by total amount"""
+        events = list(self.fs.db.collection('finance_events').stream())
+        
+        payee_totals = {}
+        for event_doc in events:
+            event = event_doc.to_dict()
+            payee = event.get('payee', 'Unknown')
+            amount = self._parse_amount(event.get('amount', '0'))
+            
+            if payee not in payee_totals:
+                payee_totals[payee] = {'total': 0, 'count': 0, 'avg': 0}
+            
+            payee_totals[payee]['total'] += amount
+            payee_totals[payee]['count'] += 1
+            payee_totals[payee]['avg'] = payee_totals[payee]['total'] / payee_totals[payee]['count']
+        
+        # Sort by total amount
+        sorted_payees = sorted(
+            payee_totals.items(), 
+            key=lambda x: x[1]['total'], 
+            reverse=True
+        )
+        
+        return sorted_payees[:limit]
+    
+    def export_to_csv(self, events, filename="finance_events.csv"):
+        """Export finance events to CSV"""
+        import csv
+        
+        with open(filename, 'w', newline='') as csvfile:
+            fieldnames = ['date', 'type', 'amount', 'currency', 'category', 'payee', 'source_email']
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            
+            writer.writeheader()
+            for event in events:
+                writer.writerow({
+                    'date': event.get('date'),
+                    'type': event.get('type'),
+                    'amount': event.get('amount'),
+                    'currency': event.get('currency'),
+                    'category': event.get('category'),
+                    'payee': event.get('payee'),
+                    'source_email': event.get('source_mail_id')
+                })
+    
+    def _parse_amount(self, amount_str):
+        """Parse amount string to float"""
+        import re
+        if not amount_str:
+            return 0.0
+        
+        # Remove currency symbols and commas
+        cleaned = re.sub(r'[€$£,]', '', str(amount_str))
+        try:
+            return float(cleaned)
+        except ValueError:
+            return 0.0
+
+# Usage
+finance_service = FinanceIntegrationService()
+monthly_summary = finance_service.get_monthly_finance_summary(2025, 6)
+trends = finance_service.get_expense_trends(months=12)
+top_payees = finance_service.get_top_payees(limit=5)
+```
+
 ## Data Schemas
 
 ### File Extraction Result Document
@@ -587,6 +921,40 @@ vendor_analysis = analytics.get_vendor_analysis()
     "files": { ... },                 # Original file results (kept for compatibility)
     "extracted_at": "2025-06-22T14:53:13Z",
     "created_at": "2025-06-22T14:53:13Z"
+}
+```
+
+### Calendar Event Document
+
+```python
+{
+    "date": "2025-06-23",             # Event date (YYYY-MM-DD)
+    "time": "13:00",                  # Event time (HH:MM)
+    "action": "Expected delivery of Amazon order #305-9866777-4782746",  # Event description
+    "source_mail_id": "28SkaA98anLw1NmUabDI",  # Source email ID
+    "source_file_id": null,           # Source file ID (if from attachment)
+    "execution_details": {            # Additional event details
+        "location": "Anoop – Ismaning",
+        "confirmation_number": "12345",
+        "guest_name": "John Doe"
+    },
+    "created_at": "2025-06-22T22:13:53.888Z"  # When event was created
+}
+```
+
+### Finance Event Document
+
+```python
+{
+    "type": "Expense",                # "Expense", "Income", "Transfer", "Refund"
+    "amount": "41.45",               # Amount as string
+    "currency": "EUR",               # Currency code
+    "date": "20062025",              # Transaction date (DDMMYYYY format)
+    "category": "Shopping",          # Category (Shopping, Travel, Utilities, etc.)
+    "payee": "Amazon.de",           # Payee/vendor name
+    "source_mail_id": "28SkaA98anLw1NmUabDI",  # Source email ID
+    "source_file_id": null,          # Source file ID (if from attachment)
+    "created_at": "2025-06-22T22:16:09.786Z"   # When event was created
 }
 ```
 

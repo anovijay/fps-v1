@@ -54,6 +54,12 @@ urgent = fs.get_urgent_items_for_briefing()
 
 # Get payments due soon
 due_soon = fs.get_payment_due_soon(days_ahead=7)
+
+# NEW: Get calendar events
+calendar_events = list(fs.db.collection('calendar_events').stream())
+
+# NEW: Get finance events
+finance_events = list(fs.db.collection('finance_events').stream())
 ```
 
 ## 🎯 Use Cases by Service Type
@@ -78,7 +84,16 @@ due_soon = fs.get_payment_due_soon(days_ahead=7)
 
 ## 📊 Data Structure Overview
 
-The FPS system stores structured data in the `file_extraction_results` collection. Each document represents a processed file (invoice, receipt, contract, etc.) with these key fields:
+The FPS system stores structured data in **four main collections**:
+
+### Collections
+- **`file_extraction_results`** - Structured file data (invoices, receipts, contracts)
+- **`calendar_events`** - Calendar events extracted from emails (deliveries, check-ins, reminders)
+- **`finance_events`** - Financial transactions (expenses, income, refunds)
+- **`extraction_results`** - Email-level summaries (backward compatibility)
+
+### File Extraction Results
+Each document in `file_extraction_results` represents a processed file with these key fields:
 
 ### Essential Fields
 - `document_type`: "Invoice", "Receipt", "Contract", "Bill"

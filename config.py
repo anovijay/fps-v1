@@ -21,6 +21,7 @@ class Config:
     EXTRACTION_RESULTS_COLLECTION = 'extraction_results'
     FILE_EXTRACTION_RESULTS_COLLECTION = 'file_extraction_results'  # NEW: Structured file results
     CALENDAR_EVENTS_COLLECTION = 'calendar_events'
+    FINANCE_EVENTS_COLLECTION = 'finance_events'  # NEW: Finance events collection
     
     # Processing Configuration
     MAX_BATCH_SIZE = int(os.getenv('MAX_BATCH_SIZE', '50'))  # Max emails per batch

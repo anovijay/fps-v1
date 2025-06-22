@@ -24,6 +24,12 @@ urgent = fs.get_urgent_items_for_briefing()
 
 # Get payments due soon
 due_soon = fs.get_payment_due_soon(days_ahead=7)
+
+# NEW: Get calendar events
+calendar_events = list(fs.db.collection('calendar_events').stream())
+
+# NEW: Get finance events
+finance_events = list(fs.db.collection('finance_events').stream())
 ```
 
 ## 📊 Data Structure
@@ -155,6 +161,66 @@ def analyze_vendors():
 vendors = analyze_vendors()
 for vendor, stats in vendors.items():
     print(f"{vendor}: {stats['total_invoices']} invoices, {stats['unpaid_invoices']} unpaid")
+```
+
+### Calendar Events
+```python
+def get_upcoming_calendar_events(days=7):
+    from datetime import datetime, timedelta
+    
+    today = datetime.now().strftime("%Y-%m-%d")
+    future = (datetime.now() + timedelta(days=days)).strftime("%Y-%m-%d")
+    
+    events = list(
+        fs.db.collection('calendar_events')
+        .where("date", ">=", today)
+        .where("date", "<=", future)
+        .order_by("date")
+        .stream()
+    )
+    
+    return [event.to_dict() for event in events]
+
+# Usage
+upcoming = get_upcoming_calendar_events(days=14)
+for event in upcoming:
+    print(f"📅 {event['date']} at {event['time']}: {event['action']}")
+```
+
+### Finance Events Summary
+```python
+def get_finance_summary(category=None):
+    query = fs.db.collection('finance_events')
+    
+    if category:
+        query = query.where("category", "==", category)
+    
+    events = list(query.stream())
+    
+    total_expenses = 0
+    total_income = 0
+    
+    for event_doc in events:
+        event = event_doc.to_dict()
+        amount = float(event.get('amount', '0'))
+        
+        if event.get('type') == 'Expense':
+            total_expenses += amount
+        elif event.get('type') == 'Income':
+            total_income += amount
+    
+    return {
+        'total_expenses': total_expenses,
+        'total_income': total_income,
+        'net': total_income - total_expenses,
+        'count': len(events)
+    }
+
+# Usage
+all_finance = get_finance_summary()
+travel_finance = get_finance_summary(category="Travel")
+print(f"Total expenses: €{all_finance['total_expenses']}")
+print(f"Travel expenses: €{travel_finance['total_expenses']}")
 ```
 
 ## ⚡ Quick Filters

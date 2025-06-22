@@ -113,7 +113,8 @@ Successfully implemented the complete refactoring and integration plan for the E
 - **New Collections**:
   - `extraction_results` - Stores LLM extraction results (backward compatibility)
   - **`file_extraction_results`** - **NEW**: Stores structured file results for easy querying
-  - `calendar_events` - Stores calendar events from emails
+  - **`calendar_events`** - **NEW**: Stores calendar events from emails for scheduling
+  - **`finance_events`** - **NEW**: Stores financial transactions for expense tracking
 
 ### 7. ✅ Configuration Management
 - **File**: `config.py`
@@ -259,7 +260,7 @@ processor = BatchProcessor()
 success = processor.process_batch()
 ```
 
-### **NEW: Query Structured File Data**
+### **NEW: Query Structured Data**
 ```python
 from firestore_service import FirestoreService
 
@@ -277,6 +278,12 @@ urgent_items = fs.get_urgent_items_for_briefing()
 
 # Get payments due soon for reminders
 due_soon = fs.get_payment_due_soon(days_ahead=7)
+
+# NEW: Get calendar events for scheduling
+calendar_events = fs.db.collection('calendar_events').stream()
+
+# NEW: Get finance events for expense tracking
+finance_events = fs.db.collection('finance_events').stream()
 ```
 
 ### Command Line
@@ -297,7 +304,8 @@ ADAPTER_SERVICE_URL='https://my-adapter.run.app' python batch_processor.py
 5. **Process** response and save results to Firestore:
    - Email extraction results → `extraction_results` collection (backward compatibility)
    - **NEW**: Individual file results → `file_extraction_results` collection (structured data)
-   - Calendar events → `calendar_events` collection
+   - **NEW**: Calendar events → `calendar_events` collection (scheduling & reminders)
+   - **NEW**: Finance events → `finance_events` collection (expense tracking)
 6. **Update** email statuses to "Extracted"
 7. **Update** file statuses to "Extracted"
 
