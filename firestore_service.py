@@ -20,6 +20,7 @@ class FirestoreService:
         self.emails_collection = "emails"
         self.files_subcollection = "files"
         self.extraction_results_collection = "extraction_results"
+        self.file_extraction_results_collection = "file_extraction_results"  # NEW: Structured file results
         self.calendar_events_collection = "calendar_events"
     
     def get_emails_by_status(self, status: str) -> List[Dict[str, Any]]:
@@ -123,7 +124,7 @@ class FirestoreService:
     
     def save_extraction_result(self, email_id: str, extraction_data: Dict[str, Any]) -> bool:
         """
-        Save extraction results for an email
+        Save extraction results with structured file data for easy querying by other services
         
         Args:
             email_id: The email ID
@@ -133,25 +134,255 @@ class FirestoreService:
             bool: True if successful, False otherwise
         """
         try:
-            # Save extraction result
+            # Use a batch for atomic operations
+            batch = self.db.batch()
+            
+            # 1. Save main email extraction result (keep backward compatibility)
             extraction_ref = self.db.collection(self.extraction_results_collection).document(email_id)
-            extraction_ref.set({
+            email_data = {
                 "email_id": email_id,
                 "summary": extraction_data.get("Summary", ""),
                 "action_items": extraction_data.get("ActionItems", []),
                 "urgency": extraction_data.get("Urgency", ""),
-                "files": extraction_data.get("files", {}),
+                "has_files": bool(extraction_data.get("files", {})),
+                "files_count": len(extraction_data.get("files", {})),
+                "files": extraction_data.get("files", {}),  # Keep for backward compatibility
                 "extracted_at": firestore.SERVER_TIMESTAMP,
                 "created_at": firestore.SERVER_TIMESTAMP
-            })
+            }
+            batch.set(extraction_ref, email_data)
             
-            logger.info(f"Saved extraction result for email {email_id}")
+            # 2. Save each file as a separate document for easy querying by other services
+            files_data = extraction_data.get("files", {})
+            if files_data:
+                for file_id, file_result in files_data.items():
+                    file_doc_id = f"{email_id}_{file_id}"
+                    file_extraction_ref = self.db.collection(self.file_extraction_results_collection).document(file_doc_id)
+                    
+                    # Structure file data for easy querying by other services
+                    file_doc = {
+                        # Reference fields
+                        "email_id": email_id,
+                        "file_id": file_id,
+                        
+                        # Core extraction fields
+                        "document_type": file_result.get("Type", ""),
+                        "sender": file_result.get("sender", ""),
+                        "received_date": file_result.get("received_date", ""),
+                        "summary": file_result.get("Summary", ""),
+                        "details": file_result.get("Details", ""),
+                        "tags": file_result.get("tags", []),
+                        "urgency": file_result.get("Urgency", ""),
+                        
+                        # Financial fields (for expense tracking services)
+                        "payment_status": file_result.get("Status", "Unknown"),
+                        "action_required": file_result.get("ActionRequired", ""),
+                        "amount": file_result.get("Amount", ""),
+                        
+                        # Payment details (flattened for easy querying)
+                        "payment_due_date": "",
+                        "payment_method": "",
+                        "payment_reference": "",
+                        "payment_recipient": "",
+                        
+                        # Document categorization (for daily briefings)
+                        "is_invoice": file_result.get("Type", "").lower() == "invoice",
+                        "is_receipt": file_result.get("Type", "").lower() == "receipt",
+                        "is_contract": file_result.get("Type", "").lower() == "contract",
+                        "is_bill": file_result.get("Type", "").lower() in ["bill", "utility bill", "phone bill"],
+                        
+                        # Additional fields
+                        "authority": file_result.get("Authority", ""),
+                        "reference": file_result.get("Reference", ""),
+                        "location": file_result.get("Location", ""),
+                        
+                        # Timestamps
+                        "extracted_at": firestore.SERVER_TIMESTAMP,
+                        "created_at": firestore.SERVER_TIMESTAMP,
+                        
+                        # Keep original data for backward compatibility
+                        "original_data": file_result
+                    }
+                    
+                    # Parse payment details if available
+                    payment_details = file_result.get("PaymentDetails", {})
+                    if payment_details:
+                        file_doc["payment_due_date"] = payment_details.get("due_date", "")
+                        file_doc["payment_method"] = payment_details.get("method", "")
+                        file_doc["payment_reference"] = payment_details.get("reference", "")
+                        file_doc["payment_recipient"] = payment_details.get("recipient", "")
+                    
+                    batch.set(file_extraction_ref, file_doc)
+            
+            # Commit all operations atomically
+            batch.commit()
+            
+            logger.info(f"Saved extraction result for email {email_id} with {len(files_data)} file results")
             return True
             
         except Exception as e:
             logger.error(f"Error saving extraction result for email {email_id}: {e}")
             return False
     
+    # NEW METHODS FOR OTHER SERVICES TO QUERY STRUCTURED DATA
+    
+    def get_unpaid_invoices(self, limit: int = 50) -> List[Dict[str, Any]]:
+        """
+        Get all unpaid invoices for expense tracking services
+        
+        Args:
+            limit: Maximum number of results to return
+            
+        Returns:
+            List of unpaid invoice documents
+        """
+        try:
+            query = self.db.collection(self.file_extraction_results_collection)\
+                          .where("is_invoice", "==", True)\
+                          .where("payment_status", "==", "Unpaid")\
+                          .order_by("received_date", direction=firestore.Query.DESCENDING)\
+                          .limit(limit)
+            
+            results = []
+            for doc in query.stream():
+                result = doc.to_dict()
+                result['id'] = doc.id
+                results.append(result)
+            
+            return results
+            
+        except Exception as e:
+            logger.error(f"Error fetching unpaid invoices: {e}")
+            return []
+    
+    def get_monthly_expenses(self, year: int, month: int) -> List[Dict[str, Any]]:
+        """
+        Get all expenses for a specific month for monthly expense reports
+        
+        Args:
+            year: Year (e.g., 2025)
+            month: Month (1-12)
+            
+        Returns:
+            List of expense documents for the month
+        """
+        try:
+            # Format dates for querying
+            start_date = f"{year}-{month:02d}-01"
+            if month == 12:
+                end_date = f"{year + 1}-01-01"
+            else:
+                end_date = f"{year}-{month + 1:02d}-01"
+            
+            query = self.db.collection(self.file_extraction_results_collection)\
+                          .where("is_invoice", "==", True)\
+                          .where("received_date", ">=", start_date)\
+                          .where("received_date", "<", end_date)\
+                          .order_by("received_date")
+            
+            results = []
+            for doc in query.stream():
+                result = doc.to_dict()
+                result['id'] = doc.id
+                results.append(result)
+            
+            return results
+            
+        except Exception as e:
+            logger.error(f"Error fetching monthly expenses for {year}-{month:02d}: {e}")
+            return []
+    
+    def get_urgent_items_for_briefing(self, urgency_levels: List[str] = ["High", "Critical"]) -> List[Dict[str, Any]]:
+        """
+        Get all urgent items for daily briefings
+        
+        Args:
+            urgency_levels: List of urgency levels to include
+            
+        Returns:
+            List of urgent documents
+        """
+        try:
+            query = self.db.collection(self.file_extraction_results_collection)\
+                          .where("urgency", "in", urgency_levels)\
+                          .order_by("received_date", direction=firestore.Query.DESCENDING)
+            
+            results = []
+            for doc in query.stream():
+                result = doc.to_dict()
+                result['id'] = doc.id
+                results.append(result)
+            
+            return results
+            
+        except Exception as e:
+            logger.error(f"Error fetching urgent items: {e}")
+            return []
+    
+    def get_documents_by_type(self, document_type: str, limit: int = 50) -> List[Dict[str, Any]]:
+        """
+        Get all documents of a specific type
+        
+        Args:
+            document_type: Type of document (e.g., "Invoice", "Receipt", "Contract")
+            limit: Maximum number of results to return
+            
+        Returns:
+            List of documents of the specified type
+        """
+        try:
+            query = self.db.collection(self.file_extraction_results_collection)\
+                          .where("document_type", "==", document_type)\
+                          .order_by("received_date", direction=firestore.Query.DESCENDING)\
+                          .limit(limit)
+            
+            results = []
+            for doc in query.stream():
+                result = doc.to_dict()
+                result['id'] = doc.id
+                results.append(result)
+            
+            return results
+            
+        except Exception as e:
+            logger.error(f"Error fetching documents of type {document_type}: {e}")
+            return []
+    
+    def get_payment_due_soon(self, days_ahead: int = 7) -> List[Dict[str, Any]]:
+        """
+        Get invoices with payments due within specified days
+        
+        Args:
+            days_ahead: Number of days ahead to check for due payments
+            
+        Returns:
+            List of invoices with upcoming due dates
+        """
+        try:
+            from datetime import datetime, timedelta
+            
+            today = datetime.now().strftime("%Y-%m-%d")
+            future_date = (datetime.now() + timedelta(days=days_ahead)).strftime("%Y-%m-%d")
+            
+            query = self.db.collection(self.file_extraction_results_collection)\
+                          .where("is_invoice", "==", True)\
+                          .where("payment_status", "==", "Unpaid")\
+                          .where("payment_due_date", ">=", today)\
+                          .where("payment_due_date", "<=", future_date)\
+                          .order_by("payment_due_date")
+            
+            results = []
+            for doc in query.stream():
+                result = doc.to_dict()
+                result['id'] = doc.id
+                results.append(result)
+            
+            return results
+            
+        except Exception as e:
+            logger.error(f"Error fetching payments due soon: {e}")
+            return []
+
     def save_calendar_events(self, calendar_events: List[Dict[str, Any]]) -> bool:
         """
         Save calendar events from extraction results

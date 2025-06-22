@@ -19,6 +19,7 @@ class Config:
     EMAILS_COLLECTION = 'emails'
     FILES_SUBCOLLECTION = 'files'
     EXTRACTION_RESULTS_COLLECTION = 'extraction_results'
+    FILE_EXTRACTION_RESULTS_COLLECTION = 'file_extraction_results'  # NEW: Structured file results
     CALENDAR_EVENTS_COLLECTION = 'calendar_events'
     
     # Processing Configuration

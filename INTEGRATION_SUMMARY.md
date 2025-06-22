@@ -2,7 +2,7 @@
 
 ## Overview
 
-Successfully implemented the complete refactoring and integration plan for the Email Batch Processing System. The system now integrates with an LLM adapter service to process emails and attachments, extract insights, and save results to Firestore.
+Successfully implemented the complete refactoring and integration plan for the Email Batch Processing System. The system now integrates with an LLM adapter service to process emails and attachments, extract insights, and save results to Firestore with **enhanced structured data storage for easy querying by other services**.
 
 ## What Was Implemented
 
@@ -98,14 +98,21 @@ Successfully implemented the complete refactoring and integration plan for the E
   - Automatic filename sanitization
   - GCS URL generation
 
-### 6. ✅ Enhanced Firestore Service
+### 6. ✅ **ENHANCED** Firestore Service - **NEW STRUCTURED DATA STORAGE**
 - **File**: `firestore_service.py`
 - **New Methods**:
-  - `save_extraction_result()` - Save email extraction results
+  - `save_extraction_result()` - **ENHANCED**: Save email extraction results with structured file data
   - `save_calendar_events()` - Save calendar events in batches
   - `update_file_gcs_url()` - Update file GCS URLs
+  - **NEW QUERY METHODS FOR OTHER SERVICES**:
+    - `get_unpaid_invoices()` - Get unpaid invoices for expense tracking
+    - `get_monthly_expenses()` - Get monthly expenses for reporting
+    - `get_urgent_items_for_briefing()` - Get urgent items for daily briefings
+    - `get_documents_by_type()` - Get documents by type for categorization
+    - `get_payment_due_soon()` - Get payments due within specified days
 - **New Collections**:
-  - `extraction_results` - Stores LLM extraction results
+  - `extraction_results` - Stores LLM extraction results (backward compatibility)
+  - **`file_extraction_results`** - **NEW**: Stores structured file results for easy querying
   - `calendar_events` - Stores calendar events from emails
 
 ### 7. ✅ Configuration Management
@@ -115,13 +122,103 @@ Successfully implemented the complete refactoring and integration plan for the E
   - Environment variable support
   - Default values for all settings
   - Production/development environment detection
+  - **NEW**: Added `FILE_EXTRACTION_RESULTS_COLLECTION` configuration
 
-### 8. ✅ Example Usage & Documentation
+### 8. ✅ **ENHANCED** Example Usage & Documentation
 - **File**: `example_usage.py`
 - **Features**:
-  - Complete usage examples
+  - Complete usage examples for batch processing
+  - **NEW**: Examples for querying structured file data
+  - **NEW**: Integration examples for other services
   - Configuration demonstration
   - Safe execution (commented main function)
+
+## **🆕 NEW: Structured File Data Storage**
+
+### **Problem Solved**
+
+Previously, file extraction results were stored as JSON blobs in the `files` field, making it impossible for other services to query specific information like:
+- "All unpaid invoices"
+- "Monthly expenses" 
+- "Urgent items for daily briefings"
+
+### **Solution Implemented**
+
+Now, each file extraction result is stored as a separate document in the `file_extraction_results` collection with structured fields:
+
+```javascript
+// Example structured file document
+{
+  // Reference fields
+  "email_id": "email_123",
+  "file_id": "file_456",
+  
+  // Core extraction fields
+  "document_type": "Invoice",
+  "sender": "Company XYZ",
+  "received_date": "2025-06-22",
+  "summary": "Consulting services invoice",
+  "details": "Professional consulting services...",
+  "tags": ["Invoice", "Consulting", "Payment Due"],
+  "urgency": "High",
+  
+  // Financial fields (for expense tracking)
+  "payment_status": "Unpaid",
+  "action_required": "Make payment by due date",
+  "amount": "€1,200.00",
+  
+  // Payment details (flattened for easy querying)
+  "payment_due_date": "2025-01-30",
+  "payment_method": "Bank transfer",
+  "payment_reference": "INV-2025-001",
+  "payment_recipient": "Company XYZ",
+  
+  // Document categorization (for daily briefings)
+  "is_invoice": true,
+  "is_receipt": false,
+  "is_contract": false,
+  "is_bill": false,
+  
+  // Additional fields
+  "authority": "",
+  "reference": "INV-2025-001",
+  "location": "",
+  
+  // Timestamps
+  "extracted_at": "2025-06-22T14:53:13Z",
+  "created_at": "2025-06-22T14:53:13Z",
+  
+  // Backward compatibility
+  "original_data": { /* original file result */ }
+}
+```
+
+### **Benefits for Other Services**
+
+#### **Monthly Expense Service**
+```python
+# Easy to get all expenses for a specific month
+expenses = firestore_service.get_monthly_expenses(2025, 6)
+for expense in expenses:
+    print(f"Amount: {expense['amount']}")
+    print(f"Status: {expense['payment_status']}")
+```
+
+#### **Daily Briefing Service**
+```python
+# Easy to get urgent items
+urgent_items = firestore_service.get_urgent_items_for_briefing(["High", "Critical"])
+for item in urgent_items:
+    print(f"Urgent: {item['document_type']} from {item['sender']}")
+```
+
+#### **Expense Tracking Service**
+```python
+# Easy to find unpaid invoices
+unpaid_invoices = firestore_service.get_unpaid_invoices()
+for invoice in unpaid_invoices:
+    print(f"Unpaid: {invoice['amount']} due {invoice['payment_due_date']}")
+```
 
 ## File Changes Summary
 
@@ -130,9 +227,9 @@ Successfully implemented the complete refactoring and integration plan for the E
 | `requirements.txt` | ✅ Modified | Added `requests==2.31.0` |
 | `batch_processor.py` | ✅ Completely Refactored | New class-based architecture, adapter integration |
 | `storage_service.py` | ✅ Enhanced | Added attachment upload methods |
-| `firestore_service.py` | ✅ Enhanced | Added result storage methods |
-| `config.py` | ✅ New | Configuration management |
-| `example_usage.py` | ✅ New | Usage examples and documentation |
+| `firestore_service.py` | ✅ **MAJOR ENHANCEMENT** | **Added structured file data storage + query methods** |
+| `config.py` | ✅ Enhanced | **Added FILE_EXTRACTION_RESULTS_COLLECTION** |
+| `example_usage.py` | ✅ **MAJOR ENHANCEMENT** | **Added examples for querying structured data** |
 
 ## Configuration Options
 
@@ -162,13 +259,24 @@ processor = BatchProcessor()
 success = processor.process_batch()
 ```
 
-### Custom Configuration
+### **NEW: Query Structured File Data**
 ```python
-from batch_processor import BatchProcessor
+from firestore_service import FirestoreService
 
-# Custom adapter service URL
-processor = BatchProcessor(adapter_service_url='https://my-adapter.run.app')
-success = processor.process_batch()
+# Initialize service
+fs = FirestoreService()
+
+# Get unpaid invoices for expense tracking
+unpaid_invoices = fs.get_unpaid_invoices()
+
+# Get monthly expenses for reporting
+monthly_expenses = fs.get_monthly_expenses(2025, 6)
+
+# Get urgent items for daily briefings
+urgent_items = fs.get_urgent_items_for_briefing()
+
+# Get payments due soon for reminders
+due_soon = fs.get_payment_due_soon(days_ahead=7)
 ```
 
 ### Command Line
@@ -187,7 +295,8 @@ ADAPTER_SERVICE_URL='https://my-adapter.run.app' python batch_processor.py
 3. **Build** adapter payload with email data and GCS URLs
 4. **Call** LLM adapter service for extraction
 5. **Process** response and save results to Firestore:
-   - Email extraction results → `extraction_results` collection
+   - Email extraction results → `extraction_results` collection (backward compatibility)
+   - **NEW**: Individual file results → `file_extraction_results` collection (structured data)
    - Calendar events → `calendar_events` collection
 6. **Update** email statuses to "Extracted"
 7. **Update** file statuses to "Extracted"
@@ -205,13 +314,42 @@ ADAPTER_SERVICE_URL='https://my-adapter.run.app' python batch_processor.py
 - Timeout handling for adapter service calls
 - Proper status updates even on partial failures
 
+## **🚀 Integration Ready for Other Services**
+
+The system now provides easy-to-use query methods that other services can use:
+
+### **Expense Tracking Service Integration**
+```python
+# Get all unpaid invoices
+unpaid = firestore_service.get_unpaid_invoices()
+
+# Get monthly expenses for reports
+expenses = firestore_service.get_monthly_expenses(2025, 6)
+```
+
+### **Daily Briefing Service Integration**
+```python
+# Get urgent items for daily summary
+urgent = firestore_service.get_urgent_items_for_briefing()
+
+# Get payments due soon for reminders
+due_soon = firestore_service.get_payment_due_soon()
+```
+
+### **Document Management Service Integration**
+```python
+# Get documents by type for categorization
+invoices = firestore_service.get_documents_by_type("Invoice")
+contracts = firestore_service.get_documents_by_type("Contract")
+```
+
 ## Next Steps
 
-1. **Deploy** the LLM adapter service to your cloud environment
-2. **Update** `ADAPTER_SERVICE_URL` environment variable
-3. **Test** with a small batch of emails
-4. **Monitor** logs for any issues
-5. **Scale** by adjusting `MAX_BATCH_SIZE` as needed
+1. **Deploy** the updated service to your cloud environment
+2. **Process** some emails to populate the new structured data
+3. **Create Firestore indexes** for the query patterns (links provided in error messages)
+4. **Integrate** other services using the new query methods
+5. **Monitor** performance and adjust batch sizes as needed
 
 ## Testing
 
@@ -219,9 +357,9 @@ All files have been syntax-checked and compile successfully:
 ```bash
 ✅ batch_processor.py
 ✅ storage_service.py  
-✅ firestore_service.py
-✅ config.py
-✅ example_usage.py
+✅ firestore_service.py (enhanced)
+✅ config.py (enhanced)
+✅ example_usage.py (enhanced)
 ```
 
-The refactoring is complete and ready for production use! 🎉 
+**🎉 The refactoring is complete and ready for production use with enhanced structured data storage for easy integration with other services!** 
