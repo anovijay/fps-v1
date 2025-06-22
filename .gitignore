@@ -461,3 +461,4 @@ upload_temp/
 performance_*.log
 timing_*.log
 benchmark_*.logrhea-app-sa-key.json
+rh-app-sa-key.json
