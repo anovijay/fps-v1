@@ -1,0 +1,463 @@
+# Email Batch Processing Service - .gitignore
+
+# =============================================================================
+# PYTHON
+# =============================================================================
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+.pybuilder/
+target/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# Cython debug symbols
+cython_debug/
+
+# =============================================================================
+# CLOUD SERVICE CREDENTIALS & KEYS
+# =============================================================================
+
+# Google Cloud Service Account Keys
+*.json
+!example*.json
+!schema*.json
+!package*.json
+service-account-key.json
+*-sa-key.json
+key.json
+credentials.json
+gcp-key.json
+firebase-key.json
+firestore-key.json
+
+# AWS Credentials
+.aws/
+*.pem
+*.p12
+*.pfx
+
+# Azure Credentials
+*.publishsettings
+
+# Other API Keys
+.env.local
+.env.production
+.env.staging
+.env.development
+secrets.yaml
+secrets.yml
+config.secret.py
+
+# =============================================================================
+# DOCKER & CONTAINERIZATION
+# =============================================================================
+
+# Docker
+.dockerignore
+docker-compose.override.yml
+docker-compose.override.yaml
+
+# Kubernetes
+*.kubeconfig
+kube-config
+.kube/
+
+# =============================================================================
+# LOGS & TEMPORARY FILES
+# =============================================================================
+
+# Application logs
+*.log
+logs/
+log/
+*.log.*
+application.log
+error.log
+debug.log
+batch_processor.log
+firestore_service.log
+storage_service.log
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# =============================================================================
+# DEVELOPMENT & IDE
+# =============================================================================
+
+# Visual Studio Code
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/*.code-snippets
+
+# Local History for Visual Studio Code
+.history/
+
+# Built Visual Studio Code Extensions
+*.vsix
+
+# PyCharm
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# =============================================================================
+# EMAIL PROCESSING SPECIFIC
+# =============================================================================
+
+# Email attachments and temporary files
+attachments/
+temp_files/
+uploaded_files/
+downloads/
+email_data/
+extracted_data/
+
+# Batch processing outputs
+batch_results/
+processing_logs/
+extraction_results/
+
+# Test data
+test_emails/
+sample_data/
+mock_data/
+test_attachments/
+
+# =============================================================================
+# GOOGLE CLOUD PLATFORM
+# =============================================================================
+
+# Cloud Build
+cloudbuild.yaml.bak
+.gcloudignore
+
+# App Engine
+app.yaml.bak
+dispatch.yaml.bak
+cron.yaml.bak
+queue.yaml.bak
+
+# Cloud Functions
+.env.yaml
+
+# =============================================================================
+# BACKUP & ARCHIVE FILES
+# =============================================================================
+
+# Backup files
+*.bak
+*.backup
+*.old
+*.orig
+*_backup
+*_old
+*_original
+
+# Archive files
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+
+# =============================================================================
+# CONFIGURATION & SECRETS
+# =============================================================================
+
+# Local configuration overrides
+config.local.py
+config.dev.py
+config.prod.py
+local_config.py
+private_config.py
+
+# Environment-specific files
+.env.*
+!.env.example
+!.env.template
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# =============================================================================
+# TESTING & COVERAGE
+# =============================================================================
+
+# Test outputs
+test_results/
+test_reports/
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+
+# Mock files
+mocks/
+fixtures/
+
+# =============================================================================
+# DOCUMENTATION BUILD
+# =============================================================================
+
+# Sphinx
+docs/_build/
+docs/_static/
+docs/_templates/
+
+# MkDocs
+site/
+
+# =============================================================================
+# OPERATING SYSTEM
+# =============================================================================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# =============================================================================
+# DEPLOYMENT & CI/CD
+# =============================================================================
+
+# Deployment scripts (keep templates)
+deploy_prod.sh
+deploy_staging.sh
+!deploy.sh.template
+
+# CI/CD secrets
+.github/secrets/
+.gitlab-ci-secrets/
+.circleci/secrets/
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+terraform.tfvars
+*.tfvars
+
+# =============================================================================
+# MONITORING & OBSERVABILITY
+# =============================================================================
+
+# Monitoring data
+metrics/
+traces/
+monitoring_data/
+
+# Profiling data
+*.prof
+*.pprof
+
+# =============================================================================
+# CUSTOM EXCLUSIONS FOR THIS SERVICE
+# =============================================================================
+
+# Service-specific temporary files
+batch_*.json
+processing_*.json
+extraction_*.json
+
+# Email processing queues
+queue_data/
+pending_emails/
+failed_emails/
+
+# LLM Adapter service test data
+adapter_test_data/
+llm_responses/
+
+# Calendar integration data
+calendar_events/
+calendar_sync/
+
+# File upload staging
+staging/
+upload_temp/
+
+# Performance logs
+performance_*.log
+timing_*.log
+benchmark_*.logrhea-app-sa-key.json
