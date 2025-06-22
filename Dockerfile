@@ -10,11 +10,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Set proper permissions for service account key
-RUN chmod 600 /app/rhea-app-sa-key.json
-
-# Set environment variable
-ENV GOOGLE_APPLICATION_CREDENTIALS=/app/rhea-app-sa-key.json
+# For production, use Workload Identity or environment-based authentication
+# No service account key file needed in the container
 
 # Run the batch processor
 CMD ["python", "batch_processor.py"] 

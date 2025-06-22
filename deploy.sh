@@ -51,7 +51,7 @@ echo "🚀 Deploying Cloud Run Job..."
 gcloud run jobs create $JOB_NAME \
     --image $IMAGE_NAME \
     --region $REGION \
-    --set-env-vars="GOOGLE_APPLICATION_CREDENTIALS=/app/rhea-app-sa-key.json" \
+    --service-account="rhea-app-sa@$PROJECT_ID.iam.gserviceaccount.com" \
     --memory 1Gi \
     --cpu 1 \
     --task-timeout 1800 \
